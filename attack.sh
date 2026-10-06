@@ -27,7 +27,7 @@ OD="${1:?usage: $0 <path-to-opendesk> [variant 7|8|9] [rounds]}"
 V="${2:-7}"
 ROUNDS="${3:-1}"
 
-case "$V" in 7|8|9|10|11|12|13|14) ;; *) echo "variant must be 7-14"; exit 1;; esac
+case "$V" in 7|8|9|1[0-5]) ;; *) echo "variant must be 7-15"; exit 1;; esac
 
 # Resolve a node runtime >= 20 (the CLI bundle uses RegExp `v` flags).
 # Override with NODE_BIN=/path/to/node.
