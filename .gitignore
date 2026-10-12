@@ -4,3 +4,4 @@ verify.json
 requests.log
 received-payload.txt
 node_modules/
+captures/

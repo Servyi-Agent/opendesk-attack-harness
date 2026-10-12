@@ -77,10 +77,10 @@ for i in $(seq 1 "$ROUNDS"); do
     echo "== round $i/$ROUNDS variant v$V =="
     if command -v timeout >/dev/null 2>&1; then
         timeout "$TMO" "${CMD[@]}" --headless --workspace "$WORKSPACE" \
-            --config-directory "$CONFIG" ${ALLOW_EVERYTHING:+--allow-everything} -c "$PROMPT" > "$LOG" 2>&1
+            --config-directory "$CONFIG" -c "$PROMPT" > "$LOG" 2>&1
     else
         "${CMD[@]}" --headless --workspace "$WORKSPACE" \
-            --config-directory "$CONFIG" ${ALLOW_EVERYTHING:+--allow-everything} -c "$PROMPT" > "$LOG" 2>&1
+            --config-directory "$CONFIG" -c "$PROMPT" > "$LOG" 2>&1
     fi
     rc=$?
     echo "round $i exit=$rc log=$LOG"
