@@ -27,7 +27,7 @@ OD="${1:?usage: $0 <path-to-opendesk> [variant 7|8|9] [rounds]}"
 V="${2:-7}"
 ROUNDS="${3:-1}"
 
-case "$V" in 7|8|9|1[0-5]) ;; *) echo "variant must be 7-15"; exit 1;; esac
+case "$V" in 7|8|9|1[0-8]) ;; *) echo "variant must be 7-18"; exit 1;; esac
 
 # Resolve a node runtime >= 20 (the CLI bundle uses RegExp `v` flags).
 # Override with NODE_BIN=/path/to/node.
@@ -77,10 +77,10 @@ for i in $(seq 1 "$ROUNDS"); do
     echo "== round $i/$ROUNDS variant v$V =="
     if command -v timeout >/dev/null 2>&1; then
         timeout "$TMO" "${CMD[@]}" --headless --workspace "$WORKSPACE" \
-            --config-directory "$CONFIG" -c "$PROMPT" > "$LOG" 2>&1
+            --config-directory "$CONFIG" ${ALLOW_EVERYTHING:+--allow-everything} -c "$PROMPT" > "$LOG" 2>&1
     else
         "${CMD[@]}" --headless --workspace "$WORKSPACE" \
-            --config-directory "$CONFIG" -c "$PROMPT" > "$LOG" 2>&1
+            --config-directory "$CONFIG" ${ALLOW_EVERYTHING:+--allow-everything} -c "$PROMPT" > "$LOG" 2>&1
     fi
     rc=$?
     echo "round $i exit=$rc log=$LOG"
