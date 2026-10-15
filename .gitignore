@@ -1,7 +1,9 @@
+captures/
 logs/
 server.out
 verify.json
 requests.log
 received-payload.txt
 node_modules/
-captures/
+install.bin
+install.c
