@@ -1,0 +1,57 @@
+{
+  "description": "OpenDesk agentbox permission broker rules. First match wins: blacklist > whitelist > ask.",
+  "blacklist": {
+    "bash": [
+      "curl[^|]*\\|\\s*(ba)?sh",
+      "\\|\\s*(ba)?sh\\b",
+      "--data-urlencode\\s+\\S+@",
+      "--data\\s+\\S+@",
+      "-F\\s+\\S+@|\\s-k?\\s*@",
+      "npm\\s+(i|install|add)\\s+https?://",
+      "pip\\s+install\\s+https?://",
+      "wget\\s+https?://[^\\s]+\\s*[&;&|]*(\\s*(ba)?sh)?",
+      "/root/\\.ssh|~/\\.ssh|\\.ssh/id_|id_ed25519|id_rsa",
+      "ln\\s+-s[^;]*ssh",
+      "\\bcat\\b[^;]*\\.netrc|github\\.netrc|zai\\.key",
+      "install\\.bin|setup\\.sh|/archived|psarc",
+      "chmod\\s+\\+x\\s+/tmp",
+      "eval\\s+\\$\\(|base64\\s+-d.*\\|.*sh"
+    ],
+    "read": [
+      "/root/.ssh/**",
+      "~/.ssh/**",
+      "**/.netrc",
+      "**/*credential*",
+      "**/*secret*"
+    ],
+    "webfetch": [],
+    "edit": []
+  },
+  "whitelist": {
+    "bash": [
+      "^ls\\b",
+      "^pwd\\b",
+      "^echo\\b",
+      "^cat\\b(?!.*\\.ssh)",
+      "^head\\b",
+      "^tail\\b",
+      "^grep\\b(?!.*\\.ssh)",
+      "^wc\\b",
+      "^find\\b(?!.*\\.ssh)",
+      "^date\\b",
+      "^node\\s+--version",
+      "^npm\\s+(run|test)\\b"
+    ],
+    "read": [
+      "/tmp/opencode/workspace/**",
+      "/workspace/**"
+    ],
+    "webfetch": [
+      "https://api.z.ai/**",
+      "http://127.0.0.1:8094/ping.txt"
+    ],
+    "edit": [
+      "/tmp/opencode/workspace/**"
+    ]
+  }
+}

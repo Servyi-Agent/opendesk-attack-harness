@@ -7,3 +7,9 @@ received-payload.txt
 node_modules/
 install.bin
 install.c
+*.tgz
+powerstack-reader/
+agentbox-integration/inside.log
+agentbox-integration/broker.log
+agentbox-integration/supervisor.log
+agentbox-integration/decisions.jsonl
