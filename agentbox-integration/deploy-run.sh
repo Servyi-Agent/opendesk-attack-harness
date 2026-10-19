@@ -18,8 +18,10 @@ LLM_KEY_FILE="${LLM_KEY_FILE:?set LLM_KEY_FILE to the host file holding the z.ai
     bash -c '
       mkdir -p /root/.opendesk-config
       ln -sf /fuse/llm-key /root/.opendesk-config/llm-key
-      # opendesk serve reads the key via the gated symlink at startup
-      exec /opt/node22/bin/node /workspace/OpenDesk/dist/cli/opendesk-debug serve \
+      # node (the gate-approved binary) reads the gated key itself via preload;
+      # provider config references env://ZAI_API_KEY — no plaintext anywhere
+      exec /opt/node22/bin/node -r /root/.opendesk-config/preload-key.js \
+        /workspace/OpenDesk/dist/cli/opendesk-debug serve \
         --port 4096 --hostname 0.0.0.0 \
         --config-directory /root/.opendesk-config \
         --use-config-permissions

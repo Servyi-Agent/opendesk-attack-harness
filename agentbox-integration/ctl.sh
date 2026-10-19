@@ -6,7 +6,7 @@ AB=/workspace/opendesk-agentbox
 LOG=$AB/broker.log
 
 kill_all() {
-    for pat in "supervise-inside" "opendesk-debug serve" "broker.mjs"; do
+    for pat in "supervise-inside" "opendesk-debug serve" "broker.mjs" "agentbox/ui.mjs"; do
         for p in $(pgrep -f "$pat" 2>/dev/null); do
             [ "$p" = "$$" ] && continue
             [ "$p" = "$PPID" ] && continue
@@ -23,6 +23,7 @@ start_all() {
         sleep 5
     done
     setsid node "$AB/broker.mjs" --auto deny > "$LOG" 2>&1 < /dev/null &
+    setsid node "$AB/ui.mjs" > "$AB/ui.log" 2>&1 < /dev/null &
     sleep 2
 }
 
