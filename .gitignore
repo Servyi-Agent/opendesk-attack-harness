@@ -13,3 +13,5 @@ agentbox-integration/inside.log
 agentbox-integration/broker.log
 agentbox-integration/supervisor.log
 agentbox-integration/decisions.jsonl
+agentbox-integration/desk.log
+agentbox-integration/.engine-url

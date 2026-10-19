@@ -10,7 +10,9 @@
 // 'always' replies are persisted back into rules.json (the list learns).
 // Every decision is appended to decisions.jsonl (audit).
 //
-// Usage: node broker.mjs [--url http://127.0.0.1:4096] [--auto deny|always]
+// Usage: node broker.mjs [--url http://127.0.0.1:4096] [--auto deny|always|passthrough]
+//   --auto passthrough : lists decide known patterns; unknown asks are left
+//                        for the UI (or any other client) to answer.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -100,6 +102,10 @@ async function handle(info) {
     if (d.action === 'reject' || d.action === 'once') {
         replyKind = d.action === 'reject' ? 'reject' : 'once';
         console.log(`[agentbox] ${permission} ${d.action.toUpperCase()} (${d.why}): ${String(subject).slice(0, 100)}`);
+    } else if (AUTO === 'passthrough') {
+        console.log(`[agentbox] ${permission} PASSTHROUGH to UI: ${String(subject).slice(0, 100)}`);
+        audit({ id: info.id, permission, subject: String(subject).slice(0, 300), decision: 'passthrough', why: 'unlisted', learned: null });
+        return;
     } else {
         const u = await askUser(permission, subject);
         replyKind = u.reply;
