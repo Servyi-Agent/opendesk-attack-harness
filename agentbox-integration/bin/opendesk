@@ -14,6 +14,29 @@ BROKER_AUTO="${BROKER_AUTO:-passthrough}"  # lists auto-decide; unknown asks sur
 
 say() { printf '\033[36m[opendesk]\033[0m %s\n' "$*"; }
 
+find_agent_scripts() {
+    # explicit env wins
+    if [ -n "${AGENT_SCRIPTS:-}" ] && [ -x "$AGENT_SCRIPTS/target/release/run-agent" ]; then
+        echo "$AGENT_SCRIPTS"; return 0
+    fi
+    # active discovery: common locations, then any run-agent on PATH
+    local c
+    for c in "$HOME/agent-scripts" "$HOME/src/agent-scripts" "$HOME/code/agent-scripts" \
+             "/var/home/$USER/agent-scripts" "$HOME/.local/lib/agent-scripts"; do
+        [ -x "$c/target/release/run-agent" ] && { echo "$c"; return 0; }
+    done
+    local p
+    p="$(command -v run-agent 2>/dev/null || true)"
+    if [ -n "$p" ]; then
+        # resolve a PATH-installed run-agent back to its checkout
+        local real; real="$(readlink -f "$p")"
+        case "$real" in
+            */target/release/run-agent) echo "${real%/target/release/run-agent}"; return 0 ;;
+        esac
+    fi
+    return 1
+}
+
 ensure_engine() {
     # already up?
     local url
@@ -21,11 +44,15 @@ ensure_engine() {
     if [ -n "$url" ] && curl -s -m 3 "$url/global/health" 2>/dev/null | grep -q healthy; then
         say "engine already running at $url"; return 0
     fi
+    local AS=""
+    AS="$(find_agent_scripts)" || true
     if command -v podman >/dev/null 2>&1 && podman image exists agentbox 2>/dev/null \
-       && [ -f /dev/fuse ] && "${AGENT_SCRIPTS:-/nonexistent}/target/release/run-agent" --version >/dev/null 2>&1; then
+       && [ -f /dev/fuse ] && [ -n "$AS" ]; then
+        export AGENT_SCRIPTS="$AS"
+        say "agentbox toolchain: $AS"
         say "starting engine INSIDE the agentbox (podman mode)…"
-        ( cd "$AGENTBOX_AGENT_PATH" && LLM_KEY_FILE="$LLM_KEY_FILE" setsid "$AB/deploy-run.sh" \
-            "$AGENT_SCRIPTS" >/dev/null 2>&1 & )
+        ( cd "${AGENTBOX_AGENT_PATH:-$HOME/opendesk}" && LLM_KEY_FILE="${LLM_KEY_FILE:-}" setsid "$AB/deploy-run.sh" \
+            "$AS" >/dev/null 2>&1 & )
         # wait for any agentbox-* container to expose the engine
         for _ in $(seq 1 60); do
             for c in $(podman ps --format '{{.Names}}' 2>/dev/null | grep '^agentbox-'); do
@@ -39,7 +66,11 @@ ensure_engine() {
         say "WARNING: box engine did not come up; falling back to host mode"
     fi
     # host mode: supervised engine process (still broker-gated)
-    say "starting engine (host mode, supervised)…"
+    if [ -z "$AS" ] && command -v podman >/dev/null 2>&1; then
+        say "WARNING: agent-scripts toolchain not found (looked in \$AGENT_SCRIPTS,"
+        say "~/agent-scripts, ~/src/agent-scripts, ~/code/agent-scripts, ~/.local/lib/agent-scripts, PATH)"
+    fi
+    say "starting engine (HOST MODE — no agentbox container, secrets NOT FUSE-gated; broker lists still active)…"
     setsid "$AB/supervise-inside.sh" >> "$AB/supervisor.log" 2>&1 < /dev/null &
     for _ in $(seq 1 30); do
         curl -s -m 3 http://127.0.0.1:4096/global/health 2>/dev/null | grep -q healthy \
