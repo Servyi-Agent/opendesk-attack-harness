@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 # DEPLOYMENT MODE — run the OpenDesk engine INSIDE an agentbox container.
-# Run this from your agent_path (the dir containing workspace/ and config/):
-#   /var/home/jonas/opendesk/
-#     ├── workspace/   <- mounted at /workspace inside the box (workdir)
-#     │   └── OpenDesk/  (clone/copy the repo here; symlinks outside won't resolve)
-#     └── config/      <- mounted at /root/.config/<agent> inside
+# Run from your agent_path (dir containing workspace/); the workspace is
+# mounted at /workspace inside the box and is the ONLY guaranteed path, so
+# everything engine-related is staged under workspace/.agentbox-engine/.
 #
 # Usage:
 #   LLM_KEY_FILE=~/.secrets/zai.key ./deploy-run.sh ~/…/agent-scripts
 # Env:
-#   IMAGE=agentbox            container image tag (podman build -t agentbox …/agent-scripts)
+#   IMAGE=agentbox            container image tag
 #   NODE_BIN=/usr/bin/node    node binary INSIDE the image
-#   FORCE_HASH=…              skip hash derivation (e.g. '*' for smoke tests)
+#   FORCE_HASH=…              skip hash derivation ('*' for smoke tests)
 set -eu
 
 AGENT_SCRIPTS="${1:?usage: $0 <agent-scripts-dir>}"
@@ -19,40 +17,33 @@ IMAGE="${IMAGE:-agentbox}"
 NODE_BIN="${NODE_BIN:-/usr/bin/node}"
 LLM_KEY_FILE="${LLM_KEY_FILE:?set LLM_KEY_FILE to the host file holding the z.ai API key}"
 
-# 1. image must exist
 if ! podman image exists "$IMAGE"; then
     echo "building image $IMAGE from $AGENT_SCRIPTS …"
     podman build -t "$IMAGE" "$AGENT_SCRIPTS"
 fi
 
-# 2. hash the node binary that will actually run INSIDE the box
 HASH="${FORCE_HASH:-$(podman run --rm --entrypoint /usr/bin/sha256sum "$IMAGE" "$NODE_BIN" | cut -d' ' -f1)}"
 echo "gating secret to binary: $NODE_BIN (sha256 ${HASH:0:16}…) inside $IMAGE"
 
-# 3. stage engine files into the mounted workspace (copied: symlinks out of the mount don't resolve in-box)
 WS="$(pwd)/workspace"
-[ -f "$WS/OpenDesk/dist/cli/opendesk-debug" ] || { echo "missing $WS/OpenDesk/dist/cli/opendesk-debug — clone/copy OpenDesk there first"; exit 1; }
-mkdir -p config
-[ -f config/preload-key.js ] || cp "$(dirname "$BASH_SOURCE")/preload-key.js" config/
-[ -f config/setting.json ]   || echo '{"note":"copy your odconfig setting.json here (without inline api_key)"}' > config/setting.json
+[ -f "$WS/OpenDesk/dist/cli/opendesk-debug" ] || { echo "MISSING: $WS/OpenDesk/dist/cli/opendesk-debug — clone/copy OpenDesk there and build dist first"; exit 1; }
+STAGE="$WS/.agentbox-engine"
+mkdir -p "$STAGE"
+cp "$(dirname "$BASH_SOURCE")/preload-key.js" "$STAGE/preload-key.js"
+[ -f "$STAGE/setting.json" ] || cp "$(dirname "$BASH_SOURCE")/setting.example.json" "$STAGE/setting.json" 2>/dev/null \
+    || echo '{"note":"place your odconfig setting.json here (without inline api_key)"}' > "$STAGE/setting.json"
+echo "staged engine config in $STAGE"
 
-# 4. launch: run-agent creates/reuses the box, gates llm-key to the hashed node, execs the engine
 "$AGENT_SCRIPTS/target/release/run-agent" \
     "$HASH" \
     bash -c '
       set -e
-      mkdir -p /root/.opendesk-config
-      ln -sf /fuse/llm-key /root/.opendesk-config/llm-key
+      ln -sf /fuse/llm-key /workspace/.agentbox-engine/llm-key
       cd /workspace
-      exec '"$NODE_BIN"' -r /root/.config/config/preload-key.js \
+      exec '"$NODE_BIN"' -r /workspace/.agentbox-engine/preload-key.js \
         /workspace/OpenDesk/dist/cli/opendesk-debug serve \
         --port 4096 --hostname 0.0.0.0 \
-        --config-directory /root/.opendesk-config \
+        --config-directory /workspace/.agentbox-engine \
         --use-config-permissions
     ' \
     --secret llm-key "$LLM_KEY_FILE"
-
-# 5. from OUTSIDE, once the box is up:
-#   IP=$(podman inspect agentbox-<shorthash> | grep -oP '"IPAddress": "\K[0-9.]+')
-#   node broker.mjs --url http://$IP:4096 --auto deny
-#   node ui.mjs     --engine http://$IP:4096     # open http://127.0.0.1:4196
