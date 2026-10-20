@@ -18,9 +18,15 @@ find_node() {
              /usr/bin/node /usr/local/bin/node /opt/node*/bin/node; do
         [ -x "$c" ] && { echo "$c"; return 0; }
     done
-    # toolbox fallback (atomic Fedora hosts often have node only there)
-    c="$(toolbox run --container agentbox-dev which node 2>/dev/null || toolbox run which node 2>/dev/null || true)"
-    [ -n "$c" ] && [ -x "$c" ] && { echo "$c"; return 0; }
+    # toolbox fallback (atomic Fedora hosts often have node only there).
+    # NOTE: a toolbox-internal path (/usr/bin/node) is NOT host-executable —
+    # use the wrapper command instead.
+    if command -v toolbox >/dev/null 2>&1 && toolbox run --container agentbox-dev which node >/dev/null 2>&1; then
+        echo "toolbox run --container agentbox-dev node"; return 0
+    fi
+    if command -v toolbox >/dev/null 2>&1 && toolbox run which node >/dev/null 2>&1; then
+        echo "toolbox run node"; return 0
+    fi
     return 1
 }
 find_engine_dir() {
@@ -50,7 +56,8 @@ LOG "config=$CONFIG_DIR"
 
 while true; do
     LOG "starting engine $(date +%T)"
-    "$NODE_BIN" "$ENGINE_DIR/dist/cli/opendesk-debug" serve \
+    # shellcheck disable=SC2086 — NODE_BIN may be a "toolbox run node" prefix
+    $NODE_BIN "$ENGINE_DIR/dist/cli/opendesk-debug" serve \
         --port "$PORT" --hostname 127.0.0.1 \
         --config-directory "$CONFIG_DIR" \
         --use-config-permissions \
