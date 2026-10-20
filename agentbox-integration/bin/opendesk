@@ -46,24 +46,29 @@ ensure_engine() {
     fi
     local AS=""
     AS="$(find_agent_scripts)" || true
-    if command -v podman >/dev/null 2>&1 && podman image exists agentbox 2>/dev/null \
-       && [ -f /dev/fuse ] && [ -n "$AS" ]; then
+    if command -v podman >/dev/null 2>&1 && [ -f /dev/fuse ] && [ -n "$AS" ]; then
         export AGENT_SCRIPTS="$AS"
-        say "agentbox toolchain: $AS"
-        say "starting engine INSIDE the agentbox (podman mode)…"
-        ( cd "${AGENTBOX_AGENT_PATH:-$HOME/opendesk}" && LLM_KEY_FILE="${LLM_KEY_FILE:-}" setsid "$AB/deploy-run.sh" \
-            "$AS" >/dev/null 2>&1 & )
-        # wait for any agentbox-* container to expose the engine
-        for _ in $(seq 1 60); do
-            for c in $(podman ps --format '{{.Names}}' 2>/dev/null | grep '^agentbox-'); do
-                local ip; ip="$(podman inspect "$c" --format '{{.NetworkSettings.IPAddress}}' 2>/dev/null)"
-                if [ -n "$ip" ] && curl -s -m 2 "http://$ip:4096/global/health" 2>/dev/null | grep -q healthy; then
-                    echo "http://$ip:4096" > "$ENGINE_URL_FILE"; say "engine in box $c at $ip:4096"; return 0
-                fi
+        if ! podman image exists agentbox 2>/dev/null; then
+            say "agentbox image not found — building it once from $AS (a few minutes)…"
+            podman build -t agentbox "$AS" || say "WARNING: image build failed; continuing to host mode"
+        fi
+        if podman image exists agentbox 2>/dev/null; then
+            say "agentbox toolchain: $AS"
+            say "starting engine INSIDE the agentbox (podman mode)…"
+            ( cd "${AGENTBOX_AGENT_PATH:-$HOME/opendesk}" && LLM_KEY_FILE="${LLM_KEY_FILE:-}" setsid "$AB/deploy-run.sh" \
+                "$AS" >/dev/null 2>&1 & )
+            # wait for any agentbox-* container to expose the engine
+            for _ in $(seq 1 60); do
+                for c in $(podman ps --format '{{.Names}}' 2>/dev/null | grep '^agentbox-'); do
+                    local ip; ip="$(podman inspect "$c" --format '{{.NetworkSettings.IPAddress}}' 2>/dev/null)"
+                    if [ -n "$ip" ] && curl -s -m 2 "http://$ip:4096/global/health" 2>/dev/null | grep -q healthy; then
+                        echo "http://$ip:4096" > "$ENGINE_URL_FILE"; say "engine in box $c at $ip:4096"; return 0
+                    fi
+                done
+                sleep 3
             done
-            sleep 3
-        done
-        say "WARNING: box engine did not come up; falling back to host mode"
+            say "WARNING: box engine did not come up (see $AB/supervisor.log); falling back to host mode"
+        fi
     fi
     # host mode: supervised engine process (still broker-gated)
     if [ -z "$AS" ] && command -v podman >/dev/null 2>&1; then

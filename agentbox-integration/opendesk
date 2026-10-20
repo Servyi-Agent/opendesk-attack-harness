@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# opendesk — transparent launcher.
+# Invoked as your normal `opendesk` command; behind the scenes it:
+#   1. ensures the agentbox + engine-inside is running (podman mode if available,
+#      host mode otherwise) — idempotent, reused if already up
+#   2. ensures the permission broker (white/blacklists; unknown asks surface in the UI)
+#   3. ensures the client UI and opens it
+# Ctrl-C stops UI+broker; the engine box keeps running for instant reuse.
+set -u
+AB="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+ENGINE_URL_FILE="$AB/.engine-url"
+UI_PORT="${UI_PORT:-4196}"
+BROKER_AUTO="${BROKER_AUTO:-passthrough}"  # lists auto-decide; unknown asks surface in the UI
+
+say() { printf '\033[36m[opendesk]\033[0m %s\n' "$*"; }
+
+find_agent_scripts() {
+    # explicit env wins
+    if [ -n "${AGENT_SCRIPTS:-}" ] && [ -x "$AGENT_SCRIPTS/target/release/run-agent" ]; then
+        echo "$AGENT_SCRIPTS"; return 0
+    fi
+    # active discovery: common locations, then any run-agent on PATH
+    local c
+    for c in "$HOME/agent-scripts" "$HOME/src/agent-scripts" "$HOME/code/agent-scripts" \
+             "/var/home/$USER/agent-scripts" "$HOME/.local/lib/agent-scripts"; do
+        [ -x "$c/target/release/run-agent" ] && { echo "$c"; return 0; }
+    done
+    local p
+    p="$(command -v run-agent 2>/dev/null || true)"
+    if [ -n "$p" ]; then
+        # resolve a PATH-installed run-agent back to its checkout
+        local real; real="$(readlink -f "$p")"
+        case "$real" in
+            */target/release/run-agent) echo "${real%/target/release/run-agent}"; return 0 ;;
+        esac
+    fi
+    return 1
+}
+
+ensure_engine() {
+    # already up?
+    local url
+    url="$(cat "$ENGINE_URL_FILE" 2>/dev/null || true)"
+    if [ -n "$url" ] && curl -s -m 3 "$url/global/health" 2>/dev/null | grep -q healthy; then
+        say "engine already running at $url"; return 0
+    fi
+    local AS=""
+    AS="$(find_agent_scripts)" || true
+    if command -v podman >/dev/null 2>&1 && [ -f /dev/fuse ] && [ -n "$AS" ]; then
+        export AGENT_SCRIPTS="$AS"
+        if ! podman image exists agentbox 2>/dev/null; then
+            say "agentbox image not found — building it once from $AS (a few minutes)…"
+            podman build -t agentbox "$AS" || say "WARNING: image build failed; continuing to host mode"
+        fi
+        if podman image exists agentbox 2>/dev/null; then
+            say "agentbox toolchain: $AS"
+            say "starting engine INSIDE the agentbox (podman mode)…"
+            ( cd "${AGENTBOX_AGENT_PATH:-$HOME/opendesk}" && LLM_KEY_FILE="${LLM_KEY_FILE:-}" setsid "$AB/deploy-run.sh" \
+                "$AS" >/dev/null 2>&1 & )
+            # wait for any agentbox-* container to expose the engine
+            for _ in $(seq 1 60); do
+                for c in $(podman ps --format '{{.Names}}' 2>/dev/null | grep '^agentbox-'); do
+                    local ip; ip="$(podman inspect "$c" --format '{{.NetworkSettings.IPAddress}}' 2>/dev/null)"
+                    if [ -n "$ip" ] && curl -s -m 2 "http://$ip:4096/global/health" 2>/dev/null | grep -q healthy; then
+                        echo "http://$ip:4096" > "$ENGINE_URL_FILE"; say "engine in box $c at $ip:4096"; return 0
+                    fi
+                done
+                sleep 3
+            done
+            say "WARNING: box engine did not come up (see $AB/supervisor.log); falling back to host mode"
+        fi
+    fi
+    # host mode: supervised engine process (still broker-gated)
+    if [ -z "$AS" ] && command -v podman >/dev/null 2>&1; then
+        say "WARNING: agent-scripts toolchain not found (looked in \$AGENT_SCRIPTS,"
+        say "~/agent-scripts, ~/src/agent-scripts, ~/code/agent-scripts, ~/.local/lib/agent-scripts, PATH)"
+    fi
+    say "starting engine (HOST MODE — no agentbox container, secrets NOT FUSE-gated; broker lists still active)…"
+    setsid "$AB/supervise-inside.sh" >> "$AB/supervisor.log" 2>&1 < /dev/null &
+    for _ in $(seq 1 30); do
+        curl -s -m 3 http://127.0.0.1:4096/global/health 2>/dev/null | grep -q healthy \
+            && { echo "http://127.0.0.1:4096" > "$ENGINE_URL_FILE"; say "engine at 127.0.0.1:4096"; return 0; }
+        sleep 2
+    done
+    say "ERROR: engine failed to start (see $AB/supervisor.log)"; return 1
+}
+
+ensure_broker() {
+    pgrep -f "agentbox/broker.mjs" >/dev/null 2>&1 && { say "broker already running"; return 0; }
+    say "starting permission broker${BROKER_AUTO:+ (auto=$BROKER_AUTO)}…"
+    setsid node "$AB/broker.mjs" --url "$1" ${BROKER_AUTO:+--auto "$BROKER_AUTO"} \
+        >> "$AB/broker.log" 2>&1 < /dev/null &
+}
+
+ensure_ui() {
+    curl -s -m 2 "http://127.0.0.1:$UI_PORT/" >/dev/null 2>&1 && { say "UI already running"; return 0; }
+    say "starting UI…"
+    setsid node "$AB/desk.mjs" --engine "$1" --port "$UI_PORT" >> "$AB/desk.log" 2>&1 < /dev/null &
+    for _ in $(seq 1 10); do
+        curl -s -m 2 "http://127.0.0.1:$UI_PORT/" >/dev/null 2>&1 && return 0
+        sleep 1
+    done
+}
+
+ensure_engine || exit 1
+URL="$(cat "$ENGINE_URL_FILE")"
+ensure_broker "$URL"
+ensure_ui "$URL" || exit 1
+
+say "ready — UI at http://127.0.0.1:$UI_PORT"
+command -v xdg-open >/dev/null 2>&1 && xdg-open "http://127.0.0.1:$UI_PORT" >/dev/null 2>&1 &
+say "Ctrl-C stops UI+broker (engine keeps running for instant reuse)"
+exec tail -f "$AB/broker.log" "$AB/desk.log" 2>/dev/null
