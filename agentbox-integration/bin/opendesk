@@ -14,21 +14,30 @@ BROKER_AUTO="${BROKER_AUTO:-passthrough}"  # lists auto-decide; unknown asks sur
 
 say() { printf '\033[36m[opendesk]\033[0m %s\n' "$*"; }
 
+# persisted settings (KEY=VALUE); first successful discovery is remembered here
+ENVFILE="$AB/.env"
+[ -f "$ENVFILE" ] && . "$ENVFILE"
+save_env() { # save_env KEY VALUE
+    grep -v "^$1=" "$ENVFILE" 2>/dev/null > "$ENVFILE.tmp"; echo "$1=$2" >> "$ENVFILE.tmp"; mv "$ENVFILE.tmp" "$ENVFILE"
+}
+
 find_agent_scripts() {
     # explicit env wins
     if [ -n "${AGENT_SCRIPTS:-}" ] && [ -x "$AGENT_SCRIPTS/target/release/run-agent" ]; then
         echo "$AGENT_SCRIPTS"; return 0
     fi
-    # active discovery: common locations, then any run-agent on PATH
+    # active discovery: persisted, common locations (incl. agent_path layouts), then PATH
     local c
-    for c in "$HOME/agent-scripts" "$HOME/src/agent-scripts" "$HOME/code/agent-scripts" \
-             "/var/home/$USER/agent-scripts" "$HOME/.local/lib/agent-scripts"; do
+    for c in "${AGENTBOX_AGENT_PATH:-$HOME/opendesk}/workspace/agent-scripts" \
+             "$HOME/opendesk/workspace/agent-scripts" \
+             "$HOME/agent-scripts" "$HOME/src/agent-scripts" "$HOME/code/agent-scripts" \
+             "$HOME/.local/lib/agent-scripts" \
+             "/var/home/$USER/opendesk/workspace/agent-scripts"; do
         [ -x "$c/target/release/run-agent" ] && { echo "$c"; return 0; }
     done
     local p
     p="$(command -v run-agent 2>/dev/null || true)"
     if [ -n "$p" ]; then
-        # resolve a PATH-installed run-agent back to its checkout
         local real; real="$(readlink -f "$p")"
         case "$real" in
             */target/release/run-agent) echo "${real%/target/release/run-agent}"; return 0 ;;
@@ -46,6 +55,9 @@ ensure_engine() {
     fi
     local AS=""
     AS="$(find_agent_scripts)" || true
+    if [ -n "$AS" ]; then
+        save_env AGENT_SCRIPTS "$AS"
+    fi
     if command -v podman >/dev/null 2>&1 && [ -f /dev/fuse ] && [ -n "$AS" ]; then
         export AGENT_SCRIPTS="$AS"
         if ! podman image exists agentbox 2>/dev/null; then
@@ -82,7 +94,10 @@ ensure_engine() {
             && { echo "http://127.0.0.1:4096" > "$ENGINE_URL_FILE"; say "engine at 127.0.0.1:4096"; return 0; }
         sleep 2
     done
-    say "ERROR: engine failed to start (see $AB/supervisor.log)"; return 1
+    say "ERROR: engine failed to start; last supervisor.log lines:"
+    tail -6 "$AB/supervisor.log" 2>/dev/null | sed 's/^/  /'
+    say "hints: ENGINE_NODE / ENGINE_DIR / ENGINE_CONFIG can be set (or persisted in $AB/.env)"
+    return 1
 }
 
 ensure_broker() {

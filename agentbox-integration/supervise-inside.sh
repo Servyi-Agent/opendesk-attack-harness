@@ -18,6 +18,9 @@ find_node() {
              /usr/bin/node /usr/local/bin/node /opt/node*/bin/node; do
         [ -x "$c" ] && { echo "$c"; return 0; }
     done
+    # toolbox fallback (atomic Fedora hosts often have node only there)
+    c="$(toolbox run --container agentbox-dev which node 2>/dev/null || toolbox run which node 2>/dev/null || true)"
+    [ -n "$c" ] && [ -x "$c" ] && { echo "$c"; return 0; }
     return 1
 }
 find_engine_dir() {
