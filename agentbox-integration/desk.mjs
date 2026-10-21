@@ -78,11 +78,14 @@ async function send(){
 }
 document.getElementById('q').addEventListener('keydown', e => { if(e.key==='Enter') send(); });
 async function reply(id, r){
-  await fetch('/reply/'+id+'/'+r, {method:'POST'});
-  document.getElementById('a-'+id)?.remove(); log('permission '+id+' → '+r);
+    await fetch('/reply/'+id+'/'+r, {method:'POST'});
+    document.getElementById('a-'+id)?.remove();
+    if(!document.querySelector('.ask')){ const t=msgs.lastChild; if(t && t.className==='t') t.textContent='agent working…'; }
+    log('permission '+id+' → '+r);
 }
 function renderAsk(p){
   if(document.getElementById('a-'+p.id)) return;
+  const t=msgs.lastChild; if(t && t.className==='t') t.textContent='⏸ waiting for your decision → see "Permission asks" panel';
   const d=document.createElement('div'); d.className='ask'; d.id='a-'+p.id;
   const subj = p.metadata?.command || p.metadata?.url || p.metadata?.filePath || '';
   d.innerHTML = '<b>'+esc(p.permission)+'</b><div class="cmd">'+esc(subj).slice(0,400)+'</div>'
