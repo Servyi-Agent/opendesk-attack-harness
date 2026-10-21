@@ -123,8 +123,13 @@ node_cmd() {
     for c in "$HOME/.nvm/versions/node/"*/bin/node /usr/bin/node /usr/local/bin/node; do
         [ -x "$c" ] && { echo "$c"; return 0; }
     done
-    if command -v toolbox >/dev/null 2>&1 && toolbox run which node >/dev/null 2>&1; then
-        echo "toolbox run node"; return 0
+    # toolbox: named containers first (agentbox-dev created for the build), then default
+    if command -v toolbox >/dev/null 2>&1; then
+        for t in $(toolbox list --output-format plain 2>/dev/null | awk 'NR>1 && $1=="docker" && $3 ~ /linux/ {print $2}' | grep -v '^$'); do
+            toolbox run --container "$t" which node >/dev/null 2>&1 && { echo "toolbox run --container $t node"; return 0; }
+        done
+        toolbox run --container agentbox-dev which node >/dev/null 2>&1 && { echo "toolbox run --container agentbox-dev node"; return 0; }
+        toolbox run which node >/dev/null 2>&1 && { echo "toolbox run node"; return 0; }
     fi
     return 1
 }
