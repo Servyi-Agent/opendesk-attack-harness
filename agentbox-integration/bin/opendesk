@@ -118,18 +118,21 @@ ensure_engine() {
 }
 
 node_cmd() {
-    local c
+    local c t
     c="$(command -v node 2>/dev/null)" && { echo "$c"; return 0; }
-    for c in "$HOME/.nvm/versions/node/"*/bin/node /usr/bin/node /usr/local/bin/node; do
+    for c in "$HOME/.nvm/versions/node/"*/bin/node /usr/bin/node /usr/local/bin/node \
+             "$HOME/.volta/bin/node" "$HOME/.local/share/fnm/aliases/default/bin/node"; do
         [ -x "$c" ] && { echo "$c"; return 0; }
     done
-    # toolbox: named containers first (agentbox-dev created for the build), then default
     if command -v toolbox >/dev/null 2>&1; then
-        for t in $(toolbox list --output-format plain 2>/dev/null | awk 'NR>1 && $1=="docker" && $3 ~ /linux/ {print $2}' | grep -v '^$'); do
+        for t in $(toolbox list 2>/dev/null | awk 'NR>1 {print $2}' | grep -vE '^$|^IMAGE'); do
             toolbox run --container "$t" which node >/dev/null 2>&1 && { echo "toolbox run --container $t node"; return 0; }
         done
-        toolbox run --container agentbox-dev which node >/dev/null 2>&1 && { echo "toolbox run --container agentbox-dev node"; return 0; }
-        toolbox run which node >/dev/null 2>&1 && { echo "toolbox run node"; return 0; }
+    fi
+    # guaranteed fallback: no host node needed — run node from a container on the host network
+    if command -v podman >/dev/null 2>&1; then
+        podman image exists node:22-alpine 2>/dev/null || say "pulling node:22-alpine once for the outside services…"
+        echo "podman run --rm --network=host docker.io/library/node:22-alpine node"; return 0
     fi
     return 1
 }
