@@ -53,12 +53,22 @@ ensure_engine() {
     if [ -n "$url" ] && curl -s -m 3 "$url/global/health" 2>/dev/null | grep -q healthy; then
         say "engine already running at $url"; return 0
     fi
+    # kill any stale supervisor from an older launcher (self-diagnosis: no zombie loops)
+    local sp
+    for sp in $(pgrep -f "agentbox/supervise-inside" 2>/dev/null); do
+        [ "$sp" = "$$" ] && continue; [ "$sp" = "$PPID" ] && continue
+        kill -9 "$sp" 2>/dev/null && say "stopped stale supervisor (pid $sp)"
+    done
     local AS=""
     AS="$(find_agent_scripts)" || true
+    # --- self-diagnosis: every gate logged, no silent decisions ---
+    say "diagnostics: podman=$(command -v podman >/dev/null 2>&1 && echo yes || echo NO)"
+    say "diagnostics: /dev/fuse=$([ -c /dev/fuse ] && echo present || echo MISSING)"
+    say "diagnostics: agent-scripts=$([ -n "$AS" ] && echo "$AS" || echo NOT-FOUND)"
     if [ -n "$AS" ]; then
         save_env AGENT_SCRIPTS "$AS"
     fi
-    if command -v podman >/dev/null 2>&1 && [ -f /dev/fuse ] && [ -n "$AS" ]; then
+    if command -v podman >/dev/null 2>&1 && [ -c /dev/fuse ] && [ -n "$AS" ]; then
         export AGENT_SCRIPTS="$AS"
         if ! podman image exists agentbox 2>/dev/null; then
             say "agentbox image not found — building it once from $AS (a few minutes)…"
@@ -68,24 +78,29 @@ ensure_engine() {
             say "agentbox toolchain: $AS"
             say "starting engine INSIDE the agentbox (podman mode)…"
             ( cd "${AGENTBOX_AGENT_PATH:-$HOME/opendesk}" && LLM_KEY_FILE="${LLM_KEY_FILE:-}" setsid "$AB/deploy-run.sh" \
-                "$AS" >/dev/null 2>&1 & )
+                "$AS" > "$AB/deploy.log" 2>&1 & )
             # wait for any agentbox-* container to expose the engine
             for _ in $(seq 1 60); do
                 for c in $(podman ps --format '{{.Names}}' 2>/dev/null | grep '^agentbox-'); do
                     local ip; ip="$(podman inspect "$c" --format '{{.NetworkSettings.IPAddress}}' 2>/dev/null)"
+                    # rootless pasta sometimes leaves inspect empty — ask the box
+                    [ -n "$ip" ] || ip="$(podman exec "$c" hostname -I 2>/dev/null | awk '{print $1}')"
                     if [ -n "$ip" ] && curl -s -m 2 "http://$ip:4096/global/health" 2>/dev/null | grep -q healthy; then
                         echo "http://$ip:4096" > "$ENGINE_URL_FILE"; say "engine in box $c at $ip:4096"; return 0
                     fi
                 done
                 sleep 3
             done
-            say "WARNING: box engine did not come up (see $AB/supervisor.log); falling back to host mode"
+            say "WARNING: box engine did not come up; deploy-run output (deploy.log):"
+            tail -10 "$AB/deploy.log" 2>/dev/null | sed 's/^/  /'
+            say "falling back to host mode"
         fi
     fi
     # host mode: supervised engine process (still broker-gated)
     if [ -z "$AS" ] && command -v podman >/dev/null 2>&1; then
-        say "WARNING: agent-scripts toolchain not found (looked in \$AGENT_SCRIPTS,"
-        say "~/agent-scripts, ~/src/agent-scripts, ~/code/agent-scripts, ~/.local/lib/agent-scripts, PATH)"
+        say "reason: agent-scripts toolchain not found (searched \$AGENT_SCRIPTS, agent_path/workspace, ~/agent-scripts, ~/src, ~/code, ~/.local/lib, PATH)"
+    elif command -v podman >/dev/null 2>&1 && [ ! -c /dev/fuse ]; then
+        say "reason: /dev/fuse missing — agentbox FUSE mount impossible on this host (install/load fuse3)"
     fi
     say "starting engine (HOST MODE — no agentbox container, secrets NOT FUSE-gated; broker lists still active)…"
     setsid "$AB/supervise-inside.sh" >> "$AB/supervisor.log" 2>&1 < /dev/null &
@@ -94,9 +109,11 @@ ensure_engine() {
             && { echo "http://127.0.0.1:4096" > "$ENGINE_URL_FILE"; say "engine at 127.0.0.1:4096"; return 0; }
         sleep 2
     done
-    say "ERROR: engine failed to start; last supervisor.log lines:"
-    tail -6 "$AB/supervisor.log" 2>/dev/null | sed 's/^/  /'
-    say "hints: ENGINE_NODE / ENGINE_DIR / ENGINE_CONFIG can be set (or persisted in $AB/.env)"
+    say "ERROR: engine failed to start. Engine output (inside.log):"
+    tail -8 "$AB/inside.log" 2>/dev/null | sed 's/^/  /'
+    say "Supervisor output:"
+    tail -4 "$AB/supervisor.log" 2>/dev/null | sed 's/^/  /'
+    say "fix via: ENGINE_NODE / ENGINE_DIR / ENGINE_CONFIG (persist in $AB/.env)"
     return 1
 }
 
