@@ -12,6 +12,8 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>opendesk</
 <style>
 body{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:0;display:flex;flex-direction:column;height:100vh}
 header{padding:8px 14px;background:#1a1a2e;font-weight:600}
+#diag{padding:4px 14px;background:#12121c;color:#8a8;font-size:12px;font-family:monospace;border-bottom:1px solid #222}
+#diag.err{color:#e57373}
 main{flex:1;display:flex;overflow:hidden}
 #chat{flex:1;display:flex;flex-direction:column;border-right:1px solid #333}
 #msgs{flex:1;overflow-y:auto;padding:12px}
@@ -30,20 +32,35 @@ button{margin-right:6px;padding:5px 12px;border:0;border-radius:6px;font-weight:
 h4{margin:6px 0;color:#888;text-transform:uppercase;font-size:11px;letter-spacing:.08em}
 </style></head><body>
 <header>opendesk — engine inside the agentbox <span id="status" style="float:right;color:#888"></span></header>
+<div id="diag">diagnostics: loading…</div>
 <main><div id="chat">
   <div id="msgs"><div class="t">connecting…</div></div>
   <div id="input"><input id="q" placeholder="Message the agent… (Enter to send)" autofocus><button onclick="send()">Send</button></div>
 </div>
 <div id="asks"><h4>Permission asks</h4><div id="asklist"></div><h4>Activity</h4><div id="log" style="color:#777;font-size:11px"></div></div></main>
 <script>
+window.onerror = (m) => { const d=document.getElementById('diag'); d.className='err'; d.textContent='page error: '+m; };
+const diag = (t, err) => { const d=document.getElementById('diag'); if(err) d.className='err'; d.textContent='diagnostics: '+t; };
+async function runDiag(){
+  try {
+    const r = await fetch('/diag'); const j = await r.json();
+    diag('engine ' + j.engine + ' → ' + (j.healthy ? 'REACHABLE' : 'UNREACHABLE (' + (j.error||'no health') + ')'), !j.healthy);
+    return j.healthy;
+  } catch(e){ diag('UI proxy broken: ' + e.message, true); return false; }
+}
 let SID = null, sending = false;
 const msgs = document.getElementById('msgs'), logel = document.getElementById('log');
 const esc = s => String(s).replace(/</g,'&lt;');
 const log = m => { logel.innerHTML = esc(m) + '<br>' + logel.innerHTML; };
 function add(cls, text){ const d=document.createElement('div'); d.className='m '+cls; d.textContent=text; msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight; }
 async function newSession(){
-  const r = await fetch('/api/session', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'agentbox session'})});
-  const j = await r.json(); SID = j.id; msgs.innerHTML=''; add('a','Engine ready inside the agentbox. Ask me anything.'); log('session ' + SID);
+  const healthy = await runDiag();
+  if (!healthy) { add('a','Engine unreachable — the UI proxy cannot reach it. Check that the engine process/container from the launcher is still up.'); return; }
+  try {
+    const r = await fetch('/api/session', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'agentbox session'})});
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json(); SID = j.id; msgs.innerHTML=''; add('a','Engine ready inside the agentbox. Ask me anything.'); log('session ' + SID);
+  } catch(e){ diag('session create failed: '+e.message, true); add('a','Could not create a session: '+e.message); }
 }
 async function send(){
   const q = document.getElementById('q'); const text = q.value.trim(); if(!text || !SID || sending) return;
@@ -95,6 +112,17 @@ const proxy = (path, method, body, res) => {
 
 http.createServer((req, res) => {
     if (req.url === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(PAGE); }
+    if (req.url === '/diag') {
+        const t = setTimeout(() => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ engine: ENGINE, healthy: false, error: 'health timeout' })); }, 3500);
+        const up = http.get({ hostname: E.hostname, port: E.port, path: '/global/health', timeout: 3000 }, ur => {
+            let b = ''; ur.on('data', c => b += c);
+            ur.on('end', () => { clearTimeout(t); res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ engine: ENGINE, healthy: ur.statusCode === 200 && b.includes('healthy'), http: ur.statusCode })); });
+        });
+        up.on('error', e => { clearTimeout(t); res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ engine: ENGINE, healthy: false, error: e.code || e.message })); });
+        return;
+    }
     if (req.url === '/event') {
         const up = http.get({ hostname: E.hostname, port: E.port, path: '/event' }, ur => {
             res.writeHead(ur.statusCode, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
