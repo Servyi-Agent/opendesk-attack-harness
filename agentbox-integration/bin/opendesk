@@ -117,21 +117,40 @@ ensure_engine() {
     return 1
 }
 
+node_cmd() {
+    local c
+    c="$(command -v node 2>/dev/null)" && { echo "$c"; return 0; }
+    for c in "$HOME/.nvm/versions/node/"*/bin/node /usr/bin/node /usr/local/bin/node; do
+        [ -x "$c" ] && { echo "$c"; return 0; }
+    done
+    if command -v toolbox >/dev/null 2>&1 && toolbox run which node >/dev/null 2>&1; then
+        echo "toolbox run node"; return 0
+    fi
+    return 1
+}
+
 ensure_broker() {
     pgrep -f "agentbox/broker.mjs" >/dev/null 2>&1 && { say "broker already running"; return 0; }
-    say "starting permission broker${BROKER_AUTO:+ (auto=$BROKER_AUTO)}…"
-    setsid node "$AB/broker.mjs" --url "$1" ${BROKER_AUTO:+--auto "$BROKER_AUTO"} \
+    local NODE_CMD; NODE_CMD="$(node_cmd)" || { say "ERROR: no node found for broker (host or toolbox)"; return 1; }
+    say "starting permission broker${BROKER_AUTO:+ (auto=$BROKER_AUTO)}… [$NODE_CMD]"
+    # shellcheck disable=SC2086 — NODE_CMD may be a "toolbox run node" prefix
+    setsid $NODE_CMD "$AB/broker.mjs" --url "$1" ${BROKER_AUTO:+--auto "$BROKER_AUTO"} \
         >> "$AB/broker.log" 2>&1 < /dev/null &
 }
 
 ensure_ui() {
     curl -s -m 2 "http://127.0.0.1:$UI_PORT/" >/dev/null 2>&1 && { say "UI already running"; return 0; }
-    say "starting UI…"
-    setsid node "$AB/desk.mjs" --engine "$1" --port "$UI_PORT" >> "$AB/desk.log" 2>&1 < /dev/null &
+    local NODE_CMD; NODE_CMD="$(node_cmd)" || { say "ERROR: no node found for UI (host or toolbox)"; return 1; }
+    say "starting UI… [$NODE_CMD]"
+    # shellcheck disable=SC2086
+    setsid $NODE_CMD "$AB/desk.mjs" --engine "$1" --port "$UI_PORT" >> "$AB/desk.log" 2>&1 < /dev/null &
     for _ in $(seq 1 10); do
         curl -s -m 2 "http://127.0.0.1:$UI_PORT/" >/dev/null 2>&1 && return 0
         sleep 1
     done
+    say "ERROR: UI did not come up; desk.log tail:"
+    tail -5 "$AB/desk.log" 2>/dev/null | sed 's/^/  /'
+    return 1
 }
 
 ensure_engine || exit 1
