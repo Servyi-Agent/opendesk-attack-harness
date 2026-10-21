@@ -129,10 +129,12 @@ node_cmd() {
             toolbox run --container "$t" which node >/dev/null 2>&1 && { echo "toolbox run --container $t node"; return 0; }
         done
     fi
-    # guaranteed fallback: no host node needed — run node from a container on the host network
+    # guaranteed fallback: no host node needed — outside services (UI/broker)
+    # run in their own plain node container on the host network. This is NOT
+    # the agentbox; it is outside/trusted, equivalent to host-installed node.
     if command -v podman >/dev/null 2>&1; then
-        podman image exists node:22-alpine 2>/dev/null || say "pulling node:22-alpine once for the outside services…"
-        echo "podman run --rm --network=host docker.io/library/node:22-alpine node"; return 0
+        podman image exists node:22-alpine 2>/dev/null || podman pull -q docker.io/library/node:22-alpine >/dev/null 2>&1
+        echo "podman run --rm --network=host -v $AB:$AB:Z docker.io/library/node:22-alpine node"; return 0
     fi
     return 1
 }
