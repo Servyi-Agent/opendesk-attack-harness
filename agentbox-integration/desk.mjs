@@ -2,6 +2,8 @@
 // Full outside client: chat + permission asks in one page.
 //   node desk.mjs [--engine http://127.0.0.1:4096] [--port 4196]
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 ? process.argv[i + 1] : d; };
 const ENGINE = arg('engine', 'http://127.0.0.1:4096');
@@ -64,7 +66,14 @@ async function newSession(){
 }
 async function send(){
   const q = document.getElementById('q'); const text = q.value.trim(); if(!text || !SID || sending) return;
-  q.value=''; sending=true; add('u', text); add('t','agent working…');
+  q.value=''; sending=true; add('u', text);
+  const tdiv=document.createElement('div'); tdiv.className='t'; tdiv.textContent='agent working… (0s)'; msgs.appendChild(tdiv);
+  const t0=Date.now();
+  const tick=setInterval(()=>{ const s=Math.round((Date.now()-t0)/1000); tdiv.textContent='agent working… ('+s+'s)';
+    if(s===75){ tdiv.textContent='slow turn — engine log tail:'; fetch('/englog').then(r=>r.text()).then(l=>{
+      const pre=document.createElement('div'); pre.className='cmd'; pre.style.whiteSpace='pre-wrap'; pre.textContent=l; msgs.appendChild(pre); msgs.scrollTop=msgs.scrollHeight;
+    }); clearInterval(tick); } },1000);
+  try {
   try {
     const r = await fetch('/api/session/'+SID+'/message', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text})});
     const j = await r.json();
@@ -72,8 +81,8 @@ async function send(){
     const walk = x => { if(!x) return; if(Array.isArray(x)) return x.forEach(walk);
       if(typeof x==='object'){ if(typeof x.text==='string') out += x.text + '\\n'; Object.values(x).forEach(walk); } };
     walk(j);
-    msgs.lastChild?.remove(); add('a', out.trim() || JSON.stringify(j).slice(0,400));
-  } catch(e){ add('a','ERROR: '+e.message); }
+    clearInterval(tick); tdiv.remove(); add('a', out.trim() || JSON.stringify(j).slice(0,400));
+  } catch(e){ clearInterval(tick); tdiv.textContent='ERROR: '+e.message; }
   sending=false;
 }
 document.getElementById('q').addEventListener('keydown', e => { if(e.key==='Enter') send(); });
@@ -124,6 +133,19 @@ http.createServer((req, res) => {
         });
         up.on('error', e => { clearTimeout(t); res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ engine: ENGINE, healthy: false, error: e.code || e.message })); });
+        return;
+    }
+    if (req.url === '/englog') {
+        // last engine log lines, for the page's slow-turn self-diagnosis
+        try {
+            const logPath = path.join(import.meta.dirname, 'inside.log');
+            const lines = fs.readFileSync(logPath, 'utf8').trimEnd().split('\n').slice(-15);
+            res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end(lines.join('\n'));
+        } catch (e) {
+            res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('(inside.log not readable from the UI process: ' + (e.code || e.message) + ')');
+        }
         return;
     }
     if (req.url === '/event') {
