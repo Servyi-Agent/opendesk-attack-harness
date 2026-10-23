@@ -1,0 +1,9 @@
+# opendesk-agentbox — thin layer over the stock agentbox image.
+# Adds Node.js 22 (OpenDesk's engine bundle requires >=20: RegExp `v` flag).
+# Build: podman build -t opendesk-agentbox -f Dockerfile.opendesk .
+FROM agentbox
+
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/* && \
+    node --version | grep -q '^v22'

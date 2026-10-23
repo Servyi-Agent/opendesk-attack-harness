@@ -70,11 +70,10 @@ ensure_engine() {
     fi
     if command -v podman >/dev/null 2>&1 && [ -c /dev/fuse ] && [ -n "$AS" ]; then
         export AGENT_SCRIPTS="$AS"
-        if ! podman image exists agentbox 2>/dev/null; then
-            say "agentbox image not found — building it once from $AS (a few minutes)…"
-            podman build -t agentbox "$AS" || say "WARNING: image build failed; continuing to host mode"
+        if ! podman image exists opendesk-agentbox 2>/dev/null && ! podman image exists agentbox 2>/dev/null; then
+            say "no agentbox image — deploy-run will build the base + thin node-22 layer on first launch"
         fi
-        if podman image exists agentbox 2>/dev/null; then
+        if podman image exists opendesk-agentbox 2>/dev/null || podman image exists agentbox 2>/dev/null; then
             say "agentbox toolchain: $AS"
             say "starting engine INSIDE the agentbox (podman mode)…"
             ( cd "${AGENTBOX_AGENT_PATH:-$HOME/opendesk}" && LLM_KEY_FILE="${LLM_KEY_FILE:-}" setsid "$AB/deploy-run.sh" \
