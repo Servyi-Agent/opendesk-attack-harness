@@ -17,6 +17,7 @@ say() { printf '\033[36m[opendesk]\033[0m %s\n' "$*"; }
 # persisted settings (KEY=VALUE); first successful discovery is remembered here
 ENVFILE="$AB/.env"
 [ -f "$ENVFILE" ] && . "$ENVFILE"
+export LLM_KEY_FILE="${LLM_KEY_FILE:-$HOME/secrets/zai.key}"
 save_env() { # save_env KEY VALUE
     grep -v "^$1=" "$ENVFILE" 2>/dev/null > "$ENVFILE.tmp"; echo "$1=$2" >> "$ENVFILE.tmp"; mv "$ENVFILE.tmp" "$ENVFILE"
 }

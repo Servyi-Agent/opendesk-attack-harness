@@ -1,0 +1,23 @@
+synced current files ✓
+[36m[opendesk][0m diagnostics: podman=yes
+[36m[opendesk][0m diagnostics: /dev/fuse=present
+[36m[opendesk][0m diagnostics: agent-scripts=/home/jonas/opendesk/workspace/agent-scripts
+[36m[opendesk][0m agentbox toolchain: /home/jonas/opendesk/workspace/agent-scripts
+[36m[opendesk][0m starting engine INSIDE the agentbox (podman mode)…
+LAUNCH_EXIT=124
+== deploy.log ==
+/var/home/jonas/opendesk/workspace/opendesk-agentbox/deploy-run.sh: line 18: LLM_KEY_FILE: set LLM_KEY_FILE to the host file holding the z.ai API key
+== images ==
+docker.io/library/node:22-alpine
+localhost/agentbox:latest
+== containers ==
+ruby-python-work | Up 6 weeks
+inspiring_tu | Exited (0) 5 months ago
+agentbox-d95fce30 | Exited (143) 6 weeks ago
+agentbox-ae30b1f0 | Up 10 days
+agentbox-539411e1 | Up 10 days
+agentbox-cde7f226 | Up 10 days
+agentbox-a9af9994 | Up 10 days
+agentbox-4014410a | Up 10 days
+dazzling_hoover | Up 4 days
+affectionate_keldysh | Up 3 days

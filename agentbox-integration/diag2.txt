@@ -1,0 +1,65 @@
+[36m[opendesk][0m engine already running at http://127.0.0.1:4096
+[36m[opendesk][0m broker already running
+[36m[opendesk][0m UI already running
+[36m[opendesk][0m ready — UI at http://127.0.0.1:4196
+[36m[opendesk][0m Ctrl-C stops UI+broker (engine keeps running for instant reuse)
+==> /var/home/jonas/opendesk/workspace/opendesk-agentbox/broker.log <==
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+[agentbox] event stream down (connect ECONNREFUSED 127.0.0.1:4096); retrying in 2s
+
+==> /var/home/jonas/opendesk/workspace/opendesk-agentbox/desk.log <==
+opendesk UI: http://127.0.0.1:4196 → engine http://127.0.0.1:4096
+setsid: failed to execute node: No such file or directory
+setsid: failed to execute node: No such file or directory
+opendesk UI: http://127.0.0.1:4196 → engine http://127.0.0.1:4096
+setsid: failed to execute [36m[opendesk][0m: No such file or directory
+opendesk UI: http://127.0.0.1:4196 → engine http://127.0.0.1:4096
+
+== deploy.log ==
+gating secret to binary: /usr/bin/node (sha256 f3f93db342d5ac5b…) inside agentbox
+staged engine config in /home/jonas/opendesk/workspace/.agentbox-engine
+[preload-key] gated key unreadable: ENOENT
+file:///workspace/OpenDesk/dist/cli/opendesk-debug:28396
+    zeroWidthRegex = new RegExp("^(?:\\p{Default_Ignorable_Code_Point}|\\p{Control}|\\p{Mark}|\\p{Surrogate})+$", "v");
+                     ^
+
+SyntaxError: Invalid flags supplied to RegExp constructor 'v'
+    at new RegExp (<anonymous>)
+    at node_modules/@earendil-works/pi-tui/dist/utils.js [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:28396:22[90m)[39m
+    at __init [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:18:56[90m)[39m
+    at node_modules/@earendil-works/pi-tui/dist/components/box.js [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:28608:5[90m)[39m
+    at __init [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:18:56[90m)[39m
+    at node_modules/@earendil-works/pi-tui/dist/index.js [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:36270:5[90m)[39m
+    at __init [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:18:56[90m)[39m
+    at src/main/tui/components/card.ts [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:36302:5[90m)[39m
+    at __init [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:18:56[90m)[39m
+    at src/main/aikernel/interaction/tools.ts [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:122478:5[90m)[39m
+
+Node.js v18.19.1
+
+== images ==
+docker.io/library/node:22-alpine
+localhost/agentbox:latest
+
+== containers ==
+ruby-python-work | Up 6 weeks | registry.fedoraproject.org/fedora-toolbox:43
+inspiring_tu | Exited (0) 5 months ago | localhost/agentbox:latest
+agentbox-d95fce30 | Exited (143) 6 weeks ago | localhost/agentbox:latest
+agentbox-ae30b1f0 | Up 10 days | localhost/agentbox:latest
+agentbox-539411e1 | Up 10 days | localhost/agentbox:latest
+agentbox-cde7f226 | Up 10 days | localhost/agentbox:latest
+agentbox-a9af9994 | Up 10 days | localhost/agentbox:latest
+agentbox-4014410a | Up 10 days | localhost/agentbox:latest
+dazzling_hoover | Up 4 days | docker.io/library/node:22-alpine
+affectionate_keldysh | Up 3 days | docker.io/library/node:22-alpine
+
+== engine-url ==
+http://127.0.0.1:4096

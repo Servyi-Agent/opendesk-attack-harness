@@ -1,0 +1,75 @@
+== deploy.log ==
+gating secret to binary: /usr/bin/node (sha256 f3f93db342d5ac5b…) inside agentbox
+staged engine config in /home/jonas/opendesk/workspace/.agentbox-engine
+[preload-key] gated key unreadable: ENOENT
+file:///workspace/OpenDesk/dist/cli/opendesk-debug:28396
+    zeroWidthRegex = new RegExp("^(?:\\p{Default_Ignorable_Code_Point}|\\p{Control}|\\p{Mark}|\\p{Surrogate})+$", "v");
+                     ^
+
+SyntaxError: Invalid flags supplied to RegExp constructor 'v'
+    at new RegExp (<anonymous>)
+    at node_modules/@earendil-works/pi-tui/dist/utils.js [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:28396:22[90m)[39m
+    at __init [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:18:56[90m)[39m
+    at node_modules/@earendil-works/pi-tui/dist/components/box.js [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:28608:5[90m)[39m
+    at __init [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:18:56[90m)[39m
+    at node_modules/@earendil-works/pi-tui/dist/index.js [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:36270:5[90m)[39m
+    at __init [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:18:56[90m)[39m
+    at src/main/tui/components/card.ts [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:36302:5[90m)[39m
+    at __init [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:18:56[90m)[39m
+    at src/main/aikernel/interaction/tools.ts [90m(file:///workspace/[39mOpenDesk/dist/cli/opendesk-debug:122478:5[90m)[39m
+
+Node.js v18.19.1
+
+== supervisor.log ==
+[engine] engine exited rc=1 11:39:36; restarting in 3s
+[engine] starting engine 11:39:39
+[engine] engine exited rc=1 11:39:42; restarting in 3s
+[engine] starting engine 11:39:45
+[engine] engine exited rc=1 11:39:49; restarting in 3s
+[engine] starting engine 11:39:52
+[engine] engine exited rc=1 11:39:56; restarting in 3s
+[engine] starting engine 11:39:59
+[engine] engine exited rc=1 11:40:03; restarting in 3s
+[engine] starting engine 11:40:06
+
+== inside.log ==
+[2026-10-26 11:40:01 | [33mwarn[39m] AgentOffice: failed to load custom agent from /home/jonas/opendesk/config/agents/main: Error: agents.md not found in /home/jonas/opendesk/config/agents/main
+[2026-10-26 11:40:03 | [32minfo[39m] CustomAgent: agent.json not found, derived name="agent" when_to_use="Content Writer"
+[2026-10-26 11:40:03 | [32minfo[39m] CustomAgent: agent.json not found, derived name="agent" when_to_use="Project Planner"
+[2026-10-26 11:40:03 | [32minfo[39m] CustomAgent: agent.json not found, derived name="agent" when_to_use="Research Analyst"
+[2026-10-26 11:40:03 | [32minfo[39m] CustomAgent loaded: name="agent" from /home/jonas/opendesk/config/apps/agentoffice/staffs/12e2d46e-126d-4bf8-b955-32fb5f5cbc47/agent (skills=0)
+[2026-10-26 11:40:03 | [32minfo[39m] CustomAgent loaded: name="agent" from /home/jonas/opendesk/config/apps/agentoffice/staffs/c40ad29f-0233-4a3b-89e1-e6dfb1c4d81a/agent (skills=0)
+[2026-10-26 11:40:03 | [32minfo[39m] CustomAgent loaded: name="agent" from /home/jonas/opendesk/config/apps/agentoffice/staffs/b7cadd79-1daf-4699-abda-76a0d471253b/agent (skills=0)
+[2026-10-26 11:40:03 | [32minfo[39m] AgentRegistry: registered 3 agent(s) from agentoffice (lazy)
+[serve] AI kernel 初始化完成
+[serve] 服务器启动失败: listen EADDRINUSE: address already in use 127.0.0.1:4096
+
+== images ==
+docker.io/library/node:22-alpine
+<none>:<none>
+<none>:<none>
+docker.io/library/rust:1-slim
+localhost/agentbox:latest
+<none>:<none>
+<none>:<none>
+registry.fedoraproject.org/fedora-toolbox:43
+localhost/fedora-agent-env:latest
+registry.fedoraproject.org/fedora:43
+registry.fedoraproject.org/fedora-minimal:43
+docker.io/library/ubuntu:24.04
+docker.io/library/python:3.11-slim
+
+== containers ==
+ruby-python-work | Up 6 weeks | registry.fedoraproject.org/fedora-toolbox:43
+inspiring_tu | Exited (0) 5 months ago | localhost/agentbox:latest
+agentbox-d95fce30 | Exited (143) 6 weeks ago | localhost/agentbox:latest
+agentbox-ae30b1f0 | Up 10 days | localhost/agentbox:latest
+agentbox-539411e1 | Up 10 days | localhost/agentbox:latest
+agentbox-cde7f226 | Up 10 days | localhost/agentbox:latest
+agentbox-a9af9994 | Up 10 days | localhost/agentbox:latest
+agentbox-4014410a | Up 10 days | localhost/agentbox:latest
+dazzling_hoover | Up 4 days | docker.io/library/node:22-alpine
+affectionate_keldysh | Up 3 days | docker.io/library/node:22-alpine
+
+== engine-url ==
+http://127.0.0.1:4096
