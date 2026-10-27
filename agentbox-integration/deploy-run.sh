@@ -46,7 +46,16 @@ cp "$(dirname "$BASH_SOURCE")/preload-key.js" "$STAGE/preload-key.js"
     || echo '{"note":"place your odconfig setting.json here (without inline api_key)"}' > "$STAGE/setting.json"
 echo "staged engine config in $STAGE"
 
-"$AGENT_SCRIPTS/target/release/run-agent" --image "$IMAGE" \
+# RECREATE_BOX=1 (default): run-agent --restart-container — ensures the box is
+# built from THIS image (reuse-by-name ignores --image otherwise) and re-applies
+# the /fuse binds. The engine box is stateless (config lives on mounts), so a
+# fresh box per launch is safe. Set RECREATE_BOX=0 to keep a persistent box.
+RC_ARGS=""
+[ "${RECREATE_BOX:-1}" = "1" ] && RC_ARGS="--restart-container"
+
+"$AGENT_SCRIPTS/target/release/run-agent" \
+    --image "$IMAGE" \
+    $RC_ARGS \
     "$HASH" \
     bash -c '
       set -e
